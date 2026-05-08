@@ -8,9 +8,9 @@ use ratatui::{
 
 use crate::game::{GameMode, GameState, Screen};
 
-const PHOSPHOR: Color = Color::Rgb(0, 255, 0);
-const PHOSPHOR_DIM: Color = Color::Rgb(0, 180, 0);
-const PHOSPHOR_DARK: Color = Color::Rgb(0, 100, 0);
+const PHOSPHOR: Color = Color::Rgb(0, 255, 200);
+const PHOSPHOR_DIM: Color = Color::Rgb(0, 200, 156);
+const PHOSPHOR_DARK: Color = Color::Rgb(0, 128, 100);
 const ERROR_RED: Color = Color::Rgb(255, 40, 40);
 const BG: Color = Color::Rgb(0, 0, 0);
 const AMBER: Color = Color::Rgb(255, 176, 0);
