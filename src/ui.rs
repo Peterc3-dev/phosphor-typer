@@ -128,7 +128,7 @@ fn draw_mode_select(f: &mut Frame, area: Rect, state: &GameState) {
     );
     f.render_widget(header, chunks[0]);
 
-    let modes = vec![
+    let modes = [
         (
             "CLASSIC",
             "Standard typing test. 60-second rounds.",
@@ -227,7 +227,11 @@ fn draw_playing(f: &mut Frame, area: Rect, state: &GameState) {
 fn draw_stats_bar(f: &mut Frame, area: Rect, state: &GameState) {
     let time_left = state.time_remaining();
     let time_str = if state.mode == GameMode::Cascade {
-        format!("TIME: {:02}:{:02}", time_left.as_secs() / 60, time_left.as_secs() % 60)
+        format!(
+            "TIME: {:02}:{:02}",
+            time_left.as_secs() / 60,
+            time_left.as_secs() % 60
+        )
     } else {
         format!("TIME: {:02}s", time_left.as_secs())
     };
@@ -259,7 +263,9 @@ fn draw_stats_bar(f: &mut Frame, area: Rect, state: &GameState) {
         Span::styled(" | ", Style::default().fg(PHOSPHOR_DARK)),
         Span::styled(
             format!("COMBO: {}x ", state.combo),
-            Style::default().fg(combo_color).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(combo_color)
+                .add_modifier(Modifier::BOLD),
         ),
         Span::styled(" | ", Style::default().fg(PHOSPHOR_DARK)),
         Span::styled(
@@ -270,11 +276,13 @@ fn draw_stats_bar(f: &mut Frame, area: Rect, state: &GameState) {
         Span::styled(
             time_str,
             Style::default()
-                .fg(if state.time_remaining().as_secs() <= 10 && state.mode != GameMode::Cascade {
-                    ERROR_RED
-                } else {
-                    PHOSPHOR
-                })
+                .fg(
+                    if state.time_remaining().as_secs() <= 10 && state.mode != GameMode::Cascade {
+                        ERROR_RED
+                    } else {
+                        PHOSPHOR
+                    },
+                )
                 .add_modifier(Modifier::BOLD),
         ),
     ]);
@@ -364,9 +372,7 @@ fn draw_typing_area(f: &mut Frame, area: Rect, state: &GameState) {
                 for tc in &typed_chars[chars.len()..] {
                     current_line_spans.push(Span::styled(
                         tc.to_string(),
-                        Style::default()
-                            .fg(Color::Rgb(255, 255, 255))
-                            .bg(ERROR_RED),
+                        Style::default().fg(Color::Rgb(255, 255, 255)).bg(ERROR_RED),
                     ));
                 }
             }
@@ -412,7 +418,9 @@ fn draw_input_line(f: &mut Frame, area: Rect, state: &GameState) {
         ),
         Span::styled(
             "█",
-            Style::default().fg(PHOSPHOR).add_modifier(Modifier::SLOW_BLINK),
+            Style::default()
+                .fg(PHOSPHOR)
+                .add_modifier(Modifier::SLOW_BLINK),
         ),
     ]))
     .block(
@@ -447,7 +455,11 @@ fn draw_cascade(f: &mut Frame, area: Rect, state: &GameState) {
         Span::styled(
             format!("COMBO: {}x ", state.combo),
             Style::default()
-                .fg(if state.combo >= 5 { AMBER } else { PHOSPHOR_DIM })
+                .fg(if state.combo >= 5 {
+                    AMBER
+                } else {
+                    PHOSPHOR_DIM
+                })
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(" | ", Style::default().fg(PHOSPHOR_DARK)),
@@ -497,7 +509,9 @@ fn draw_cascade(f: &mut Frame, area: Rect, state: &GameState) {
     for fw in &state.falling_words {
         let row = fw.row_f as u16;
         if row < field_inner.height {
-            let x = fw.col.min(field_inner.width.saturating_sub(fw.word.len() as u16));
+            let x = fw
+                .col
+                .min(field_inner.width.saturating_sub(fw.word.len() as u16));
             let render_area = Rect::new(
                 field_inner.x + x,
                 field_inner.y + row,
@@ -541,10 +555,7 @@ fn draw_cascade(f: &mut Frame, area: Rect, state: &GameState) {
                 } else {
                     PHOSPHOR
                 };
-                vec![Span::styled(
-                    fw.word.clone(),
-                    Style::default().fg(color),
-                )]
+                vec![Span::styled(fw.word.clone(), Style::default().fg(color))]
             };
 
             let word_para = Paragraph::new(Line::from(word_spans));
@@ -591,14 +602,10 @@ fn draw_game_over(f: &mut Frame, area: Rect, state: &GameState) {
 
     // Big WPM display
     let wpm_display = format!("{:.0}", state.wpm);
-    let big_wpm = Paragraph::new(vec![
-        Line::from(Span::styled(
-            format!("  {}  WPM", wpm_display),
-            Style::default()
-                .fg(PHOSPHOR)
-                .add_modifier(Modifier::BOLD),
-        )),
-    ])
+    let big_wpm = Paragraph::new(vec![Line::from(Span::styled(
+        format!("  {}  WPM", wpm_display),
+        Style::default().fg(PHOSPHOR).add_modifier(Modifier::BOLD),
+    ))])
     .alignment(Alignment::Center)
     .block(
         Block::default()
@@ -650,10 +657,7 @@ fn draw_game_over(f: &mut Frame, area: Rect, state: &GameState) {
         ]),
         Line::from(vec![
             Span::styled("  Max Combo:  ", Style::default().fg(PHOSPHOR_DIM)),
-            Span::styled(
-                format!("{}x", state.max_combo),
-                Style::default().fg(AMBER),
-            ),
+            Span::styled(format!("{}x", state.max_combo), Style::default().fg(AMBER)),
         ]),
     ];
 
@@ -752,14 +756,12 @@ fn draw_high_scores(f: &mut Frame, area: Rect, state: &GameState) {
             )));
         } else {
             // Header row
-            lines.push(Line::from(vec![
-                Span::styled(
-                    "    #  WPM     ACC     COMBO  WORDS",
-                    Style::default()
-                        .fg(PHOSPHOR_DIM)
-                        .add_modifier(Modifier::UNDERLINED),
-                ),
-            ]));
+            lines.push(Line::from(vec![Span::styled(
+                "    #  WPM     ACC     COMBO  WORDS",
+                Style::default()
+                    .fg(PHOSPHOR_DIM)
+                    .add_modifier(Modifier::UNDERLINED),
+            )]));
 
             for (i, score) in top.iter().enumerate() {
                 let color = if i == 0 { AMBER } else { PHOSPHOR_DIM };

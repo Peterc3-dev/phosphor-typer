@@ -146,15 +146,11 @@ fn run_app(
                             state.mode = GameMode::Cascade;
                             state.start_round();
                         }
-                        KeyCode::Up => {
-                            if state.selected_menu_item > 0 {
-                                state.selected_menu_item -= 1;
-                            }
+                        KeyCode::Up if state.selected_menu_item > 0 => {
+                            state.selected_menu_item -= 1;
                         }
-                        KeyCode::Down => {
-                            if state.selected_menu_item < 2 {
-                                state.selected_menu_item += 1;
-                            }
+                        KeyCode::Down if state.selected_menu_item < 2 => {
+                            state.selected_menu_item += 1;
                         }
                         KeyCode::Enter => {
                             state.mode = match state.selected_menu_item {

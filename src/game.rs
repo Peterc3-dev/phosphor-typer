@@ -188,7 +188,7 @@ impl GameState {
             _ => 10,
         };
 
-        if self.tick_count % spawn_interval == 0 {
+        if self.tick_count.is_multiple_of(spawn_interval) {
             let word = words::get_cascade_word(self.difficulty);
             let mut rng = rand::thread_rng();
             use rand::Rng;
@@ -211,7 +211,8 @@ impl GameState {
         // Check for words that hit the bottom
         let height = self.cascade_height;
         let before = self.falling_words.len();
-        self.falling_words.retain(|fw| (fw.row_f as u16) < height - 2);
+        self.falling_words
+            .retain(|fw| (fw.row_f as u16) < height - 2);
         let removed = before - self.falling_words.len();
         self.cascade_missed += removed as u32;
 
@@ -265,7 +266,8 @@ impl GameState {
 
                 // Generate more words if running low
                 if self.current_word_idx >= self.words.len().saturating_sub(5) {
-                    let mut more = words::get_words_for_round(self.mode.word_source(), self.difficulty);
+                    let mut more =
+                        words::get_words_for_round(self.mode.word_source(), self.difficulty);
                     self.words.append(&mut more);
                 }
             }
@@ -292,7 +294,10 @@ impl GameState {
             self.cascade_typed.clear();
         } else {
             // Check if typed string is a prefix of any falling word
-            let is_prefix = self.falling_words.iter().any(|fw| fw.word.starts_with(typed.as_str()));
+            let is_prefix = self
+                .falling_words
+                .iter()
+                .any(|fw| fw.word.starts_with(typed.as_str()));
             if !is_prefix {
                 // No match possible, reset
                 self.cascade_typed.clear();
@@ -350,4 +355,162 @@ fn chrono_lite_timestamp() -> String {
         .unwrap_or_default()
         .as_secs();
     format!("{}", secs)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mode_label_and_source_mapping() {
+        assert_eq!(GameMode::Classic.label(), "classic");
+        assert_eq!(GameMode::Hacker.label(), "hacker");
+        assert_eq!(GameMode::Cascade.label(), "cascade");
+
+        // Classic plays single hacker words; Hacker mode plays code snippets.
+        assert_eq!(GameMode::Classic.word_source(), "hacker");
+        assert_eq!(GameMode::Hacker.word_source(), "code");
+        assert_eq!(GameMode::Cascade.word_source(), "hacker");
+    }
+
+    /// Build a state with a fixed word list, no timer running, so handler
+    /// logic can be exercised without touching the terminal or the clock.
+    fn state_with_words(words: &[&str]) -> GameState {
+        let mut state = GameState::new();
+        state.mode = GameMode::Classic;
+        state.words = words.iter().map(|s| s.to_string()).collect();
+        state.current_word_idx = 0;
+        state
+    }
+
+    fn type_str(state: &mut GameState, s: &str) {
+        for c in s.chars() {
+            state.handle_char(c);
+        }
+    }
+
+    #[test]
+    fn correct_word_advances_and_builds_combo() {
+        let mut state = state_with_words(&["abc", "de"]);
+        type_str(&mut state, "abc");
+
+        assert_eq!(state.correct_words, 1);
+        assert_eq!(state.combo, 1);
+        assert_eq!(state.max_combo, 1);
+        assert_eq!(state.total_words_attempted, 1);
+        assert_eq!(state.current_word_idx, 1);
+        assert_eq!(state.correct_chars, 3);
+        assert_eq!(state.total_chars, 3);
+        assert!(state.typed.is_empty());
+    }
+
+    #[test]
+    fn wrong_word_resets_combo_but_counts_attempt() {
+        let mut state = state_with_words(&["abc", "de"]);
+        // Build a combo first.
+        type_str(&mut state, "abc");
+        assert_eq!(state.combo, 1);
+
+        // Now mistype the next word ("de" -> "dx").
+        type_str(&mut state, "dx");
+        assert_eq!(state.combo, 0);
+        assert_eq!(state.max_combo, 1, "max_combo should retain its peak");
+        assert_eq!(state.correct_words, 1);
+        assert_eq!(state.total_words_attempted, 2);
+        assert_eq!(state.current_word_idx, 2);
+    }
+
+    #[test]
+    fn space_skip_advances_and_breaks_combo() {
+        let mut state = state_with_words(&["abc", "de"]);
+        type_str(&mut state, "abc");
+        assert_eq!(state.combo, 1);
+
+        state.typed.push('d');
+        state.handle_space_skip();
+
+        assert_eq!(state.combo, 0);
+        assert_eq!(state.current_word_idx, 2);
+        assert_eq!(state.total_words_attempted, 2);
+        assert!(state.typed.is_empty());
+    }
+
+    #[test]
+    fn backspace_removes_last_typed_char() {
+        let mut state = state_with_words(&["abcd"]);
+        type_str(&mut state, "ab");
+        state.handle_backspace();
+        assert_eq!(state.typed, "a");
+
+        // Cascade backspace operates on the cascade buffer instead.
+        let mut cas = GameState::new();
+        cas.mode = GameMode::Cascade;
+        cas.cascade_typed = "xy".to_string();
+        cas.handle_backspace();
+        assert_eq!(cas.cascade_typed, "x");
+    }
+
+    #[test]
+    fn cascade_match_clears_word_and_scores() {
+        let mut state = GameState::new();
+        state.mode = GameMode::Cascade;
+        state.falling_words.push(FallingWord {
+            word: "kernel".to_string(),
+            col: 1,
+            row_f: 0.0,
+            speed: 0.1,
+        });
+
+        for c in "kernel".chars() {
+            state.handle_char(c);
+        }
+
+        assert!(state.falling_words.is_empty(), "matched word removed");
+        assert_eq!(state.correct_words, 1);
+        assert_eq!(state.combo, 1);
+        assert!(state.cascade_score > 0);
+        assert!(state.cascade_typed.is_empty());
+    }
+
+    #[test]
+    fn cascade_non_prefix_resets_buffer_and_combo() {
+        let mut state = GameState::new();
+        state.mode = GameMode::Cascade;
+        state.combo = 3;
+        state.falling_words.push(FallingWord {
+            word: "kernel".to_string(),
+            col: 1,
+            row_f: 0.0,
+            speed: 0.1,
+        });
+
+        // 'z' is not a prefix of "kernel": buffer and combo reset.
+        state.handle_char('z');
+        assert!(state.cascade_typed.is_empty());
+        assert_eq!(state.combo, 0);
+
+        // A valid prefix is retained.
+        state.combo = 2;
+        state.handle_char('k');
+        assert_eq!(state.cascade_typed, "k");
+        assert_eq!(state.combo, 2, "valid prefix keeps the combo");
+    }
+
+    #[test]
+    fn time_remaining_counts_down_classic_and_up_cascade() {
+        let mut state = GameState::new();
+        state.mode = GameMode::Classic;
+        state.round_duration = Duration::from_secs(60);
+        state.elapsed = Duration::from_secs(20);
+        assert_eq!(state.time_remaining(), Duration::from_secs(40));
+
+        // Past the round length saturates at zero rather than underflowing.
+        state.elapsed = Duration::from_secs(75);
+        assert_eq!(state.time_remaining(), Duration::ZERO);
+
+        // Cascade reports elapsed instead of remaining.
+        state.mode = GameMode::Cascade;
+        state.elapsed = Duration::from_secs(12);
+        assert_eq!(state.time_remaining(), Duration::from_secs(12));
+    }
 }

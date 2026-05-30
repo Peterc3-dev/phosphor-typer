@@ -215,8 +215,14 @@ pub fn get_words_for_round(mode: &str, difficulty: u32) -> Vec<String> {
     // Filter by difficulty for hacker words (single words have meaningful length)
     if mode == "hacker" {
         pool = match difficulty {
-            0..=2 => pool.into_iter().filter(|w| w.len() <= EASY_MAX_LEN).collect(),
-            3..=5 => pool.into_iter().filter(|w| w.len() <= MEDIUM_MAX_LEN).collect(),
+            0..=2 => pool
+                .into_iter()
+                .filter(|w| w.len() <= EASY_MAX_LEN)
+                .collect(),
+            3..=5 => pool
+                .into_iter()
+                .filter(|w| w.len() <= MEDIUM_MAX_LEN)
+                .collect(),
             _ => pool,
         };
     }
@@ -233,9 +239,81 @@ pub fn get_words_for_round(mode: &str, difficulty: u32) -> Vec<String> {
 pub fn get_cascade_word(difficulty: u32) -> String {
     let mut rng = rand::thread_rng();
     let pool: Vec<&&str> = match difficulty {
-        0..=2 => HACKER_WORDS.iter().filter(|w| w.len() <= EASY_MAX_LEN).collect(),
-        3..=5 => HACKER_WORDS.iter().filter(|w| w.len() <= MEDIUM_MAX_LEN).collect(),
+        0..=2 => HACKER_WORDS
+            .iter()
+            .filter(|w| w.len() <= EASY_MAX_LEN)
+            .collect(),
+        3..=5 => HACKER_WORDS
+            .iter()
+            .filter(|w| w.len() <= MEDIUM_MAX_LEN)
+            .collect(),
         _ => HACKER_WORDS.iter().collect(),
     };
     pool.choose(&mut rng).unwrap().to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn round_word_count_in_expected_range() {
+        for _ in 0..50 {
+            let words = get_words_for_round("hacker", 0);
+            assert!(
+                (30..=60).contains(&words.len()),
+                "got {} words",
+                words.len()
+            );
+            assert!(words.iter().all(|w| !w.is_empty()));
+        }
+    }
+
+    #[test]
+    fn easy_difficulty_filters_hacker_words_by_length() {
+        // Difficulty 0..=2 caps hacker words at EASY_MAX_LEN.
+        for _ in 0..50 {
+            for w in get_words_for_round("hacker", 0) {
+                assert!(w.len() <= EASY_MAX_LEN, "{:?} exceeds easy length cap", w);
+            }
+        }
+    }
+
+    #[test]
+    fn medium_difficulty_widens_length_cap() {
+        for _ in 0..50 {
+            for w in get_words_for_round("hacker", 4) {
+                assert!(w.len() <= MEDIUM_MAX_LEN, "{:?} exceeds medium cap", w);
+            }
+        }
+    }
+
+    #[test]
+    fn code_mode_draws_only_from_code_snippets() {
+        for _ in 0..20 {
+            for w in get_words_for_round("code", 0) {
+                assert!(
+                    CODE_SNIPPETS.contains(&w.as_str()),
+                    "{:?} is not a code snippet",
+                    w
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn unknown_mode_falls_back_to_hacker_words() {
+        for w in get_words_for_round("totally-unknown", 9) {
+            assert!(HACKER_WORDS.contains(&w.as_str()));
+        }
+    }
+
+    #[test]
+    fn cascade_word_respects_easy_length_cap() {
+        for _ in 0..100 {
+            let w = get_cascade_word(0);
+            assert!(w.len() <= EASY_MAX_LEN, "{:?} too long for easy", w);
+            assert!(HACKER_WORDS.contains(&w.as_str()));
+        }
+    }
 }
